@@ -6,9 +6,9 @@ import argparse
 
 
 source_path = 'data/pure_rgb.bvh'
-target_path = 'data/pure_imu.bvh'
+target_path = 'data/prev_output.bvh'
 output_path = 'data/retargeted.bvh'
-retarget_trans = True
+ignore_trans = True
 
 class Bvh_tree_mod(BvhTree):
     def __init__(self, data):
@@ -67,8 +67,8 @@ retarget_dict = {
     "Spine": "spine_2_rx",
     "Spine1": "spine_3_rx",
     "Spine2": "spine_4_rx",
-    "Neck": None,
-    "Neck1": "neck_rx",
+    "Neck": "neck_rx",
+    "Neck1": None,
     "Head": "head_rx",
 
     "RightShoulder": "right_clavicle_rx",
@@ -104,7 +104,7 @@ def bvh_modify(args):
     source_channel_order = ''.join([channel[:1].upper() for channel in source_channel_names if channel.endswith("rotation")])
     target_channel_order = ''.join([channel[:1].upper() for channel in target_channel_names if channel.endswith("rotation")])
 
-    if not args.ignore_trans:
+    if not ignore_trans:
         source_channels_idx = source_bvh.get_joint_channels_index(source_root_name)
         target_channels_idx = target_bvh.get_joint_channels_index(target_root_name)
         source_pos_channels_idx = source_channels_idx + source_bvh.get_joint_channel_index(source_root_name, source_channel_names[0])
@@ -132,6 +132,5 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--source_path', type=str, default=source_path)
     parser.add_argument('-t', '--target_path', type=str, default=target_path)
     parser.add_argument('-o', '--output_path', type=str, default=output_path)
-    parser.add_argument('-i', '--ignore_trans', action='store_true')
     args = parser.parse_args()
     bvh_modify(args)
