@@ -6,11 +6,8 @@ import argparse
 
 
 input_path = 'data/out_in_imu.bvh'
-mat_path = 'data/RGB2IMU_mat.npy'
+mat_path = 'data/transformation.npy'
 output_path = 'data/out_in_rgb.bvh'
-
-
-position_offset = np.array([0, -10, 0])
 
 
 class Bvh_tree_mod(BvhTree):
@@ -61,10 +58,9 @@ def get_rotations(bvh_tree, joint_name, channel_order):
 def bvh_modify(args):
     with open(args.input_path) as f:
         mocap = Bvh_tree_mod(f.read())
-    rgb2imu = np.load(args.mat_path)
-    imu2rgb = np.linalg.inv(rgb2imu)
-    scale = 1 / math.sqrt(imu2rgb[0, 0] ** 2 + imu2rgb[0, 1] ** 2 + imu2rgb[0, 2] ** 2)
-    imu2rgb_r = imu2rgb[:3, :3] * scale
+    trans_mat = np.load(args.mat_path)
+    scale = 1 / math.sqrt(trans_mat[0, 0] ** 2 + trans_mat[0, 1] ** 2 + trans_mat[0, 2] ** 2)
+    rotation_mat = trans_mat[:3, :3] * scale
     mocap.scaling_joints_offset(1/scale)
 
     root_name = mocap.get_joints_names()[0]
@@ -76,7 +72,7 @@ def bvh_modify(args):
     print(channel_order)
 
     joint_rotations = get_rotations(mocap, root_name, channel_order)
-    rotation_offset = R.from_matrix(imu2rgb_r)
+    rotation_offset = R.from_matrix(rotation_mat)
 
     new_rotations = rotation_offset * joint_rotations
 
@@ -85,9 +81,8 @@ def bvh_modify(args):
     pos_channels_idx = channels_idx + mocap.get_joint_channel_index(root_name, channel_names[0])
 
     nonhomogen_a = frames[:, pos_channels_idx:pos_channels_idx + 3]
-    nonhomogen_a += position_offset
     homogen_a = np.hstack((nonhomogen_a, np.ones((nonhomogen_a.shape[0], 1))))
-    homogen_b = (imu2rgb @ homogen_a.T).T
+    homogen_b = (trans_mat @ homogen_a.T).T
     nonhomogen_b = homogen_b[:, :3] / (np.vstack((homogen_b[:, 3], homogen_b[:, 3], homogen_b[:, 3]))).T
 
     frames[:, pos_channels_idx:pos_channels_idx + 3] = nonhomogen_b
@@ -95,6 +90,9 @@ def bvh_modify(args):
 
     for joint_name in mocap.get_joints_names():
         if joint_name == root_name:
+            continue
+        channel_names = mocap.joint_channels(joint_name)
+        if channel_names[0].endswith("rotation"):
             continue
         channels_idx = mocap.get_joint_channels_index(joint_name)
         pos_channels_idx = channels_idx + mocap.get_joint_channel_index(joint_name, channel_names[0])
