@@ -7,10 +7,10 @@ import argparse
 rgb_path = 'data/rgb_in_imu.bvh'
 imu_path = 'data/imu_in_imu.bvh'
 output_path = 'data/out_in_imu.bvh'
-total_step = 100000
+total_step = 30000
 weight_0 = 100
 weight_1 = 10
-delta = 0.001
+delta = 0.0001
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -109,17 +109,21 @@ def postprocess(args):
     channels_idx = rgb_bvh.get_joint_channels_index(root_name)
     pos_channels_idx = channels_idx + rgb_bvh.get_joint_channel_index(root_name, channel_names[0])
 
-    output_frames = rgb_frames.copy()
+    output_frames = imu_frames.copy()
 
-    rgb_root_translation = torch.Tensor(rgb_frames[:, pos_channels_idx:pos_channels_idx + 3]).to(device)
-    imu_root_translation = torch.Tensor(imu_frames[:, pos_channels_idx:pos_channels_idx + 3]).to(device)
+    length = min(rgb_frames.shape[0], imu_frames.shape[0])
+    print(length)
+
+    rgb_root_translation = torch.Tensor(rgb_frames[:length, pos_channels_idx:pos_channels_idx + 3]).to(device)
+    imu_root_translation = torch.Tensor(imu_frames[:length, pos_channels_idx:pos_channels_idx + 3]).to(device)
 
     target_root_translation = optimize(imu_root_translation, rgb_root_translation)
 
-    output_frames[:, pos_channels_idx:pos_channels_idx + 3] = target_root_translation.cpu().detach().numpy()
+    output_frames[:length, pos_channels_idx:pos_channels_idx + 3] = target_root_translation.cpu().detach().numpy()
+    output_frames = output_frames[:length]
 
-    set_motion_data(rgb_bvh, output_frames)
-    rgb_bvh.write_file(args.output_path)
+    set_motion_data(imu_bvh, output_frames)
+    imu_bvh.write_file(args.output_path)
 
 
 if __name__ == '__main__':
